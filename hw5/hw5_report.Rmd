@@ -1,0 +1,139 @@
+---
+title: "hw5"
+header-includes:
+    - \usepackage{xeCJK}
+    - \usepackage{fontspec}
+    - \usepackage{ctex}
+output:
+  word_document: default
+  pdf_document: 
+    latex_engine: xelatex
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+### 0316306 周 煥 然 
+
+這次使用的dataset為： Auto MPG Data Set(from UCI machine learning repository) 
+
+資料有8個屬性： 
+
+1. mpg: continuous 
+2. cylinders: multi-valued discrete 
+3. displacement: continuous 
+4. horsepower: continuous 
+5. weight: continuous 
+6. acceleration: continuous 
+7. model year: multi-valued discrete 
+8. origin: multi-valued discrete 
+9. car name: string (unique for each instance) 
+
+這個資料庫主要要利用其他的屬性，預測出一台車子的mpg(mile per gallon) 
+在看過資料之後，發現在horsepower的欄位有些許缺失值 
+
+```{r , echo=FALSE}
+a <- read.table("/home/jeff/study/datascience/hw3/auto-mpg.data")
+colnames(a) <- c("mpg", "cylinders", "displacement", 
+                                  "horsepower", "weight", "acceleration", "model_year",
+                                                   "origin", "car_name")
+a$horsepower <- as.character.factor(a$horsepower) 
+```
+
+```{r a}
+which(a$horsepower == '?')
+```
+
+ 
+因此我先算出horsepower的平均值，並將他填為缺失值 
+ 
+
+```{r aa}
+a$horsepower[which(a$horsepower == '?')]  = NA
+a$horsepower <- as.numeric(a$horsepower)
+horsepoer.mean <- mean(a$horsepower , na.rm =T)
+a$horsepower[which(is.na(a$horsepower))] = horsepoer.mean
+which(is.na(a$horsepower))
+```
+
+
+## 資料分析  
+
+首先我們先看一下資料的summary, 
+
+```{r summary}
+summary(a)
+```
+  
+我們主要要找出mpg與其他欄位的關係，因此我們可以先看看他們的correlation   
+    
+  
+```{r pressure}
+library(corrplot)
+cormat <- round(cor(a[1:8]), 2)
+corrplot(cormat, method = 'ellipse')
+```
+    
+圖中我們可以發現acceleration、model_year與origin屬性皆與其他屬性的相關性較低 
+接著我們可以找出幾個比較相關的屬性，畫出他們的散佈圖看看,    
+     
+       
+
+```{r plot1}
+library(ggplot2)
+ggplot(a, aes(x = horsepower, y=weight)) + geom_point()
+ggplot(a, aes(x = weight, y=displacement)) + geom_point()
+ggplot(a, aes(x = cylinders, y=acceleration)) + geom_point()
+```
+
+由於cylinders屬性是multi-valued discrete的型態,我們也可以畫出boxplot看看,   
+    
+    
+```{r plot3}
+library(ggplot2)
+a1 <- a
+a1$cylinders <- as.factor(a1$cylinders)
+ggplot(a1, aes(x = cylinders, y=mpg)) + geom_boxplot()
+ggplot(a1, aes(x = cylinders, y=weight)) + geom_boxplot()
+
+```
+  
+  
+我們可以從許多圖中看到一些outlier的存在，但是無法以單純二維或三維的途中來找出整個dataset的outlier，  
+有時我們在一個二維圖中找出的outlier，再加上其他屬性一起參考之後，可能就不是outlier了。  
+  
+  
+因此在這裡我運用了cook's distance嘗試找出整體資料的outlier，  
+
+```{r cookd}
+a2 <- a[1:6]
+mod <- lm(mpg ~ ., data=a2)
+cooksd <- cooks.distance(mod)
+plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance")
+abline(h = 5*mean(cooksd, na.rm=T), col="red")
+
+```
+我將紅線以上的資料視為outlier，  
+之後我們可以找出這些資料來看看。  
+
+```{r cookd2}
+influential <- as.numeric(names(cooksd)[(cooksd > 5*mean(cooksd, na.rm=T))])
+a[influential, ]
+```
+
+
+## Summary  
+
+這些outlier的資料除了mpg稍微極端之外，在其他屬性看不出來甚麼趨勢，
+例如:  
+```{r cookd3}
+a[c(72,395), ]
+```
+這兩筆資料其實看起來還滿相似的，但mpg卻差異很大。  
+我認為之後若要進一步分析，應該要把outlier考慮進去，
+因為這些資料都是真實的車輛資料，不像動植物的資料有些可能有基因突變的機率，
+縱使有些車輛的設計與其他不太一樣，也應該有他的設計原因，因此我認為應該把這些也考慮進去。  
+

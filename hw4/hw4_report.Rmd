@@ -1,0 +1,123 @@
+---
+title: "hw3"
+header-includes:
+    - \usepackage{xeCJK}
+    - \usepackage{fontspec}
+    - \usepackage{ctex}
+output:
+  word_document: default
+  pdf_document: 
+    latex_engine: xelatex
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+### 0316306 周 煥 然 
+
+這次使用的dataset為： Auto MPG Data Set(from UCI machine learning repository) 
+
+資料有8個屬性： 
+
+1. mpg: continuous 
+2. cylinders: multi-valued discrete 
+3. displacement: continuous 
+4. horsepower: continuous 
+5. weight: continuous 
+6. acceleration: continuous 
+7. model year: multi-valued discrete 
+8. origin: multi-valued discrete 
+9. car name: string (unique for each instance) 
+
+這個資料庫主要要利用其他的屬性，預測出一台車子的mpg(mile per gallon) 
+在看過資料之後，發現在horsepower的欄位有些許缺失值 
+
+```{r , echo=FALSE}
+a <- read.table("/home/jeff/study/datascience/hw3/auto-mpg.data")
+colnames(a) <- c("mpg", "cylinders", "displacement", 
+                                  "horsepower", "weight", "acceleration", "model_year",
+                                                   "origin", "car_name")
+a$horsepower <- as.character.factor(a$horsepower) 
+```
+
+```{r a}
+which(a$horsepower == '?')
+```
+
+ 
+因此我先算出horsepower的平均值，並將他填為缺失值 
+ 
+
+```{r aa}
+a$horsepower[which(a$horsepower == '?')]  = NA
+a$horsepower <- as.numeric(a$horsepower)
+horsepoer.mean <- mean(a$horsepower , na.rm =T)
+a$horsepower[which(is.na(a$horsepower))] = horsepoer.mean
+which(is.na(a$horsepower))
+```
+
+
+## 資料分析  
+
+首先我們先看一下資料的summary, 
+
+```{r summary}
+summary(a)
+```
+  
+我們主要要找出mpg與其他欄位的關係，因此我們可以先看看他們的correlation   
+    
+  
+```{r pressure}
+library(corrplot)
+cormat <- round(cor(a[1:8]), 2)
+corrplot(cormat, method = 'ellipse')
+```
+    
+圖中我們可以發現acceleration、model_year與origin屬性皆與其他屬性的相關性較低 
+接著我們可以找出幾個比較相關的屬性，畫出他們的散佈圖看看,    
+     
+       
+
+```{r plot1}
+library(ggplot2)
+ggplot(a, aes(x = horsepower, y=mpg)) + geom_point()
+ggplot(a, aes(x = weight, y=mpg)) + geom_point()
+ggplot(a, aes(x = cylinders, y=mpg)) + geom_point()
+ggplot(a, aes(x = displacement, y=mpg)) + geom_point()
+```
+
+由於cylinders屬性是multi-valued discrete的型態,我們也可以畫出boxplot看看,   
+    
+    
+```{r plot3}
+library(ggplot2)
+a1 <- a
+a1$cylinders <- as.factor(a1$cylinders)
+ggplot(a1, aes(x = cylinders, y=mpg)) + geom_boxplot()
+ggplot(a1, aes(x = cylinders, y=weight)) + geom_boxplot()
+
+```
+  
+  
+
+除了XY維度之外,我們可以用顏色當成一個新的維度.   
+    
+    
+```{r plot2}
+library(ggplot2)
+ggplot(a, aes(x = horsepower, y=mpg)) + geom_point(aes(color = cylinders))
+ggplot(a, aes(x = horsepower, y=mpg)) + geom_point(aes(color = displacement))
+ggplot(a, aes(x = weight, y=mpg)) + geom_point(aes(color = cylinders))
+```
+
+## Summary  
+
+我們可以藉由畫圖,更容易的了解每個屬性彼此之間的關係,   
+有時這些圖就能告訴我們一些平常不容易看到的事情,  
+之後我們可以利用一些資料分析的方法，例如regression來找出參數，
+就可利用其他屬性來預測車輛的mpg。 
+

@@ -1,0 +1,243 @@
+---
+title: "hw6"
+header-includes:
+    - \usepackage{xeCJK}
+    - \usepackage{fontspec}
+    - \usepackage{ctex}
+output:
+  word_document: default
+  pdf_document: 
+    latex_engine: xelatex
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+### 0316306 周 煥 然 
+
+這次使用的dataset為： Auto MPG Data Set(from UCI machine learning repository) 
+
+資料有8個屬性： 
+
+1. mpg: continuous 
+2. cylinders: multi-valued discrete 
+3. displacement: continuous 
+4. horsepower: continuous 
+5. weight: continuous 
+6. acceleration: continuous 
+7. model year: multi-valued discrete 
+8. origin: multi-valued discrete 
+9. car name: string (unique for each instance) 
+
+這個資料庫主要要利用其他的屬性，預測出一台車子的mpg(mile per gallon) 
+## 補齊缺失值  
+在看過資料之後，發現在horsepower的欄位有些許缺失值 
+
+```{r , echo=FALSE}
+a <- read.table("/home/jeff/study/datascience/hw3/auto-mpg.data")
+colnames(a) <- c("mpg", "cylinders", "displacement", 
+                                  "horsepower", "weight", "acceleration", "model_year",
+                                                   "origin", "car_name")
+a$horsepower <- as.character.factor(a$horsepower) 
+```
+
+```{r a}
+which(a$horsepower == '?')
+```
+
+ 
+因此我先算出horsepower的平均值，並將他填為缺失值 
+ 
+
+```{r aa}
+a$horsepower[which(a$horsepower == '?')]  = NA
+a$horsepower <- as.numeric(a$horsepower)
+horsepoer.mean <- mean(a$horsepower , na.rm =T)
+a$horsepower[which(is.na(a$horsepower))] = horsepoer.mean
+which(is.na(a$horsepower))
+```
+
+
+## 資料分析  
+
+首先我們先看一下資料的summary, 
+
+```{r summary}
+summary(a)
+```
+  
+我們主要要找出mpg與其他欄位的關係，因此我們可以先看看他們的correlation   
+    
+  
+```{r pressure}
+library(corrplot)
+cormat <- round(cor(a[1:8]), 2)
+corrplot(cormat, method = 'ellipse')
+```
+    
+圖中我們可以發現acceleration、model_year與origin屬性皆與其他屬性的相關性較低 
+
+## 模型預測
+我分別使用了不同的方法來預測模型，並比較他們之間的差異。  
+首先我先將原本的資料的2/3做為training set，而1/3作為test set。  
+```{r caret}
+library(caret)
+a <- a[1:8]
+train.ind <- createDataPartition(a$mpg, p = 2/3, list = F)
+train <- a[train.ind,]
+test <- a[-train.ind,]
+```
+### linear regression
+
+這裡我們使用linear regression，首先我們用所有的屬性(name除外)來預測mpg，
+```{r lr1}
+library(caret)
+lr1 = lm(mpg ~ cylinders + horsepower + weight + displacement  + acceleration + model_year + origin, data = a)
+summary(lr1)
+```
+
+並且利用預測出來的模型來預測test set的資料，並將預測結果與實際結果的差值取平方和作為error(er1)，來與其他模型比較。
+```{r lr1-predict}
+lr1.predict <- predict(lr1 ,test)
+e <- lr1.predict - test[1] 
+elr1 <- sum(e*e)
+elr1
+```
+
+接著我如果使用沒有截距項的模型來預測:
+```{r lr2}
+lr2 = lm(mpg ~ cylinders + horsepower + weight + displacement  + acceleration + model_year + origin -1, data = a)
+summary(lr2)
+lr2.predict <- predict(lr2 ,test)
+e <- lr2.predict - test[1] 
+elr2 <- sum(e*e)
+elr2
+```
+我們可以看到雖然沒有截距項的模型R-squared的值高出許多，但預測的error(er2)是增加的，因此我認為第一個模型是較好的。  
+接著，從前面的相關係數矩陣可以發現displacement與cylinders的相關係數高達95%，因此我猜測若拿掉其中一個屬性，也可能有相似的結果(因該屬性可由另一個屬性代表)。  
+```{r lr3}
+lr3 = lm(mpg ~ cylinders + horsepower + weight   + acceleration + model_year + origin, data = a)
+summary(lr3)
+lr3.predict <- predict(lr3 ,test)
+e <- lr3.predict - test[1] 
+elr3 <- sum(e*e)
+elr3
+```
+結果顯示其實跟第一個模型預測出來的結果並沒有相差許多，因此我們可能可以使用第三個模型，雖然準確度較低，但是計算時間與訓練時間或許可以減少一些。     
+  
+我們從model的summary中可以看到horsepower的p-value較大，表示該屬性較不顯著，因此我再將他移除，使用其他屬性來建立模型。
+```{r lr4}
+lr4 = lm(mpg ~ cylinders +  weight   + acceleration + model_year + origin, data = a)
+summary(lr4)
+lr4.predict <- predict(lr4 ,test)
+e <- lr4.predict - test[1] 
+elr4 <- sum(e*e)
+elr4
+```
+可以發現預測結果幾乎與上個model相同。而從summary也可以觀察到，cylinders與acceleration的p-value也較高，因此我也將他移除看看。
+```{r lr5}
+lr5 = lm(mpg ~ weight + model_year + origin, data = a)
+summary(lr5)
+lr5.predict <- predict(lr5 ,test)
+e <- lr5.predict - test[1] 
+elr5 <- sum(e*e)
+elr5
+```
+預測的誤差高出了一些，但我認為還可以接受，因此我們可能只需要使用三個屬性(weight, model_year, origin)就可以預測一部車子的mpg。  
+### Nonparametric regression
+這裡我使用的是locally weighted regression來預測模型。  
+
+```{r loe}
+library(np)
+loe = loess(mpg ~ cylinders + horsepower + weight + displacement  , data = a)
+summary(loe)
+```
+一樣我們可以利用test set來評估我們模型。  
+```{r loe-pre}
+loe.predict <- predict(loe ,test)
+e <- loe.predict - test[1] 
+eloe <- sum(e*e)
+eloe
+```
+可以觀察到這個model的誤差明顯比前面的linear model大得多，但我們可以透過調整model的span參數，來看看能否將誤差降低。  
+以下我們實驗span為0.2, 0.4, 0.6, 0.8, 1.0, 1.5, 5.0的結果。  
+```{r loe2}
+loe2 = loess(mpg ~ cylinders + horsepower + weight + displacement  , data = a, span = 0.2)
+loe3 = loess(mpg ~ cylinders + horsepower + weight + displacement  , data = a, span = 0.4)
+loe4 = loess(mpg ~ cylinders + horsepower + weight + displacement  , data = a, span = 0.6)
+loe5 = loess(mpg ~ cylinders + horsepower + weight + displacement  , data = a, span = 0.8)
+loe6 = loess(mpg ~ cylinders + horsepower + weight + displacement  , data = a, span = 1.0)
+loe7 = loess(mpg ~ cylinders + horsepower + weight + displacement  , data = a, span = 1.5)
+loe8 = loess(mpg ~ cylinders + horsepower + weight + displacement  , data = a, span = 5.0)
+loe2.predict <- predict(loe2 ,test)
+loe3.predict <- predict(loe3 ,test)
+loe4.predict <- predict(loe4 ,test)
+loe5.predict <- predict(loe5 ,test)
+loe6.predict <- predict(loe6 ,test)
+loe7.predict <- predict(loe7 ,test)
+loe8.predict <- predict(loe8 ,test)
+e <- loe2.predict - test[1] 
+eloe2 <- sum(e*e)
+eloe2
+e <- loe3.predict - test[1] 
+eloe3 <- sum(e*e)
+eloe3
+e <- loe4.predict - test[1] 
+eloe4 <- sum(e*e)
+eloe4
+e <- loe5.predict - test[1] 
+eloe5 <- sum(e*e)
+eloe5
+e <- loe6.predict - test[1] 
+eloe6 <- sum(e*e)
+eloe6
+e <- loe7.predict - test[1] 
+eloe7 <- sum(e*e)
+eloe7
+e <- loe8.predict - test[1] 
+eloe8 <- sum(e*e)
+eloe8
+```
+我們可以看到隨著span的值越大，誤差會越來越小，但到一個程度之後就不太會再減小，反而可能會增加，最好的span值大約在0.8~1.0之間。  
+
+## Summary  
+以下我們列出我們所有使用的模型，以及他們的預測誤差:  
+1.  linear model(use all variables)  
+2.  linear model(use all variables without intercept)  
+3.  linear model(use cylinders + horsepower + weight   + acceleration + model_year + origin)  
+4.  linear model(use cylinders +  weight   + acceleration + model_year + origin)  
+5.  linear model(use weight + model_year + origin)  
+6.  locally weighted regression(with default span)  
+7.  locally weighted regression(with span = 0.2)  
+8.  locally weighted regression(with span = 0.4)  
+9.  locally weighted regression(with span = 0.6)  
+10.  locally weighted regression(with span = 0.8)  
+11.  locally weighted regression(with span = 1.0)  
+12.  locally weighted regression(with span = 1.5)  
+13.  locally weighted regression(with span = 5.0)  
+
+```{r summaryer}
+elr1
+elr2
+elr3
+elr4
+elr5
+eloe
+eloe2
+eloe3
+eloe4
+eloe5
+eloe6
+eloe7
+eloe8
+```
+從上面我們可以很清楚的比較每個模型的預測結果，我們可以發現有時候並不是使用越複雜的模型或方法就會得到越好的結果，  
+有時可能使用最簡單的linear regression就能得到相當好的效能，且並不是使用越多屬性來預測就會越準確，  
+相反的，許多屬性代表性不大，有時只會讓模型更加複雜，導致效能降低。  
+
+
+  
+

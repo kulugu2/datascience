@@ -1,0 +1,55 @@
+getwd()
+a <- read.table("/home/jeff/study/datascience/hw3/auto-mpg.data")
+head(a)
+str(a)
+colnames(a) <- c("mpg", "cylinders", "displacement", 
+                 "horsepower", "weight", "acceleration", "model_year",
+                 "origin", "car_name")
+typeof(a$horsepower)
+a$horsepower <- as.character.factor(a$horsepower)
+which(a$horsepower == '?')
+which(a[,] == '?')
+a$horsepower[which(a$horsepower == '?')]  = NA
+which(a$horsepower == '?')
+which(is.na(a$horsepower))
+a$horsepower <- as.numeric(a$horsepower)
+horsepoer.mean <- mean(a$horsepower , na.rm =T)
+typeof((a$horsepower))
+which(is.na(a$horsepower))
+a$horsepower[which(is.na(a$horsepower))] = horsepoer.mean
+which(is.na(a$horsepower))
+library(corrplot)
+head(a[1:8])
+cormat <- round(cor(a[1:8]), 2)
+a[1:8]
+corrplot(cormat, method='ellipse')
+cormat
+summary(a)
+plot(a[0:6])
+installed.packages("ggplot2")
+library(ggplot2)
+ggplot(a, aes(x = horsepower, y=weight)) + geom_point()
+ggplot(a, aes(x = weight, y=displacement)) + geom_point()
+ggplot(a, aes(x = cylinders, y=acceleration)) + geom_point()
+ggplot(a, aes(x = displacement, y=mpg)) + geom_point()
+ggplot(a, aes(x = model_year, y=mpg)) + geom_point(aes(color = cylinders))
+ggplot(a, aes(x = weight, y=mpg)) + geom_point(aes(color = cylinders))
+ggplot(a, aes(x = horsepower, y=mpg)) + geom_point(aes(color = cylinders))
+ggplot(a, aes(x = horsepower, y=mpg)) + geom_point(aes(color = displacement))
+ggplot(a, aes(x = weight, y=mpg)) + geom_point(aes(color = displacement))
+a1 <- a
+a1$cylinders <- as.factor(a1$cylinders)
+ggplot(a1, aes(x = cylinders, y=mpg)) + geom_boxplot()
+ggplot(a1, aes(x = cylinders, y=weight)) + geom_boxplot()
+boxplot(a$mpg)
+which.max(a$mpg)
+a2 <- a[1:6]
+mod <- lm(mpg ~ ., data=a2)
+cooksd <- cooks.distance(mod)
+plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance")
+abline(h = 5*mean(cooksd, na.rm=T), col="red")
+text(x=1:length(cooksd)+1, y=cooksd, labels=ifelse(cooksd>5*mean(cooksd, na.rm=T),names(cooksd),""), col="red")  # add labels
+influential <- as.numeric(names(cooksd)[(cooksd > 5*mean(cooksd, na.rm=T))])
+head(a[influential, ])
+summary(a)
+a[influential, ]

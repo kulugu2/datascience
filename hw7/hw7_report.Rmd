@@ -1,0 +1,186 @@
+---
+title: "Hw7"
+header-includes:
+    - \usepackage{xeCJK}
+    - \usepackage{fontspec}
+    - \usepackage{ctex}
+output:
+  word_document: default
+  pdf_document: 
+    latex_engine: xelatex
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+### 0316306 周 煥 然 
+
+這次使用的dataset為： Credit Approval Data Set (from UCI machine learning repository) 
+
+資料有16個屬性，但因個人隱私的問題，資料皆經過處理，因此我們不知道每個欄位代表的意義，
+
+A1:	b, a.  
+A2:	continuous.   
+A3:	continuous.  
+A4:	u, y, l, t.  
+A5:	g, p, gg.   
+A6:	c, d, cc, i, j, k, m, r, q, w, x, e, aa, ff.   
+A7:	v, h, bb, j, n, z, dd, ff, o.   
+A8:	continuous.   
+A9:	t, f.   
+A10:	t, f.   
+A11:	continuous.   
+A12:	t, f.   
+A13:	g, p, s.   
+A14:	continuous.   
+A15:	continuous.   
+A16: +,- (class attribute)    
+
+僅知道A16代表approve or disapprove  
+
+## 缺失值處理  
+在看過資料之後，發現在有些地方有缺失值，但因數量不是很多，我選擇直接忽略有缺失值的資料。  
+
+
+```{r , include=FALSE}
+a <- read.table("/home/jeff/study/datascience/hw7/crx.data", sep=',', na.strings = '?')
+a <- na.omit(a)
+credit <- a
+library(e1071)
+library(caret)
+library(kknn)
+library(rpart)
+library(rpart.plot)
+```
+
+
+
+
+## 模型預測
+我分別使用了不同的方法來預測模型，並比較他們之間的差異。  
+首先我先將原本的資料的2/3做為training set，而1/3作為test set。  
+```{r caret}
+set.seed(20180602)
+train.ind <- createDataPartition(credit$V1, p = 2/3, list = F)
+train <- credit[train.ind, ]
+test <- credit[-train.ind, ]
+dim(train) ; dim(test)
+```
+接著我們分別用各種課堂上介紹的方法來建立模型，並比較他們的效能。  
+
+### Naive Bayes  
+
+
+```{r nb}
+model.nb <- naiveBayes(V16 ~ ., train)
+model.nb
+```
+這裡我們可以看到每個欄位的條件機率，  
+
+```{r prednb,  results='hide'}
+predict(model.nb, test)
+```
+
+```{r resultnb, }
+table(predict(model.nb,test) == test$V16)/length(test$V16)
+enb <- table(predict(model.nb, test), test$V16)
+precision(enb)
+recall(enb)
+```
+準確率大約為79%。  
+
+### Logistic Regression  
+```{r lr}
+model.lr <- glm(V16 ~ ., data = train, family = "binomial")
+model.lr
+```
+
+```{r predlr,  results='hide'}
+p <- predict(model.lr, test, type = "response")
+```
+
+這裡設定閥值為0.5，來判斷結果為+或-。  
+
+```{r resultlr, }
+labels <- ifelse(p > 0.5, "+", "-")
+table(labels == test$V16)/length(test$V16)
+elr <- table(labels, test$V16)
+precision(elr)
+recall(enb)
+```
+準確率大約為82%。  
+
+###  SVM
+
+```{r svm}
+model.svm <- svm(V16 ~ ., data = train, kernel = "linear")
+model.svm
+```
+
+```{r predsvm,  results='hide'}
+predict(model.svm, test)
+```
+
+
+```{r resultsvm, }
+table(predict(model.svm, test) == test$V16)/length(test$V16)
+esvm <- table(predict(model.svm, test), test$V16)
+precision(esvm)
+recall(esvm)
+```
+準確率為83%。  
+
+接著我們試試看svm使用rbf kernel:  
+
+```{r svmrbf}
+model.svmrbf <- svm(V16 ~ ., data = train, kernel = "radial")
+model.svmrbf
+```
+
+```{r predsvmrbf,  results='hide'}
+predict(model.svmrbf, test)
+```
+
+
+```{r resultsvmrbf, }
+table(predict(model.svmrbf, test) == test$V16)/length(test$V16)
+esvmrbf <- table(predict(model.svmrbf, test), test$V16)
+precision(esvmrbf)
+recall(esvmrbf)
+```
+準確率稍微較linear kernel的svm高一些些。   
+
+### Knn  
+```{r knn}
+model <- kknn(V16 ~ ., train, test, kernel = "rectangular")
+table(model$fitted.values == test$V16)/length(test$V16)
+eknn <- table(model$fitted.values, test$V16)
+precision(eknn)
+recall(eknn)
+```
+使用預設的knn就可以有大約84%的準確率。  
+
+### Decision Trees  
+
+```{r dt}
+model.dt <- rpart(V16 ~ .,train)
+rpart.plot(model.dt)
+table(predict(model.dt, test, type = "class") == test$V16)/length(test$V16)
+edt <- table(predict(model.dt, test, type = "class"), test$V16)
+precision(edt)
+recall(edt)
+```
+大概有86%的準確率。  
+
+## 結論  
+我們可以從上面的實驗的結果看到，以這組資料而言，naive bayes classifier的效能最差，其他方法的效能差異不是很大，
+其中又以decision tree的效能最好。  
+再來我們可以看precision與recall的部分，precision的意思是在所有核准的客戶當中，
+有多少是真正符合資格的客戶，而recall的意思是在所有符合資格的客戶中，有多少是有被核准的。  
+以公司的角度來說，我認為precision是相對重要的，因為如果核准太多不符資格的客戶，可能會造成公司虧損。而precidion較高的model為svm以及decision tree，較適合用來當作此資料的模型。
+
+
+
